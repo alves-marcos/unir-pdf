@@ -1,6 +1,5 @@
 package com.unirpdf;
 
-import org.apache.pdfbox.io.RandomAccessRead;
 import org.apache.pdfbox.io.RandomAccessReadBuffer;
 import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.springframework.http.MediaType;
@@ -17,17 +16,35 @@ import java.io.IOException;
 public class UnirController {
 
     @PostMapping("/unir")
-    public ResponseEntity<byte[]> unir(@RequestParam("arquivos") MultipartFile[] arquivos) throws IOException {
+    public ResponseEntity<?> unir(@RequestParam("arquivos") MultipartFile[] arquivos) {
+
+        if (arquivos == null || arquivos.length < 2) {
+            return ResponseEntity.badRequest().body("Envie pelo menos 2 arquivos PDF.");
+        }
+
+        for (MultipartFile arquivo : arquivos) {
+            if (!"application/pdf".equals(arquivo.getContentType())) {
+                return ResponseEntity.badRequest()
+                        .body("Só aceito PDF. Problema em: " + arquivo.getOriginalFilename());
+            }
+        }
 
         PDFMergerUtility juntador = new PDFMergerUtility();
-
         ByteArrayOutputStream resultado = new ByteArrayOutputStream();
         juntador.setDestinationStream(resultado);
 
-        for (MultipartFile arquivo : arquivos) {
-            juntador.addSource(new RandomAccessReadBuffer(arquivo.getInputStream()));
-        }
+        try {
+
+            for (MultipartFile arquivo : arquivos) {
+                juntador.addSource(new RandomAccessReadBuffer(arquivo.getInputStream()));
+            }
+
             juntador.mergeDocuments(null);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest()
+                    .body("Não consegui ler um dos PDFs. Pode estar corrompido ou protegido por senha.");
+        }
 
         return ResponseEntity.ok()
                 .header("Content-Disposition", "attachment; filename=unido.pdf")
@@ -35,5 +52,6 @@ public class UnirController {
                 .body(resultado.toByteArray());
 
     }
+
 
 }
